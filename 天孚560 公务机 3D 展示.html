@@ -1,0 +1,776 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>天孚580 公务机 3D 展示</title>
+<style>
+:root {
+--g1: #bcd9f7;
+--g2: #f3f7fb;
+--fg: #0f2038;
+--pn: rgba(255, 255, 255, .78);
+--bd: rgba(15, 32, 56, .18);
+--ac: #1c5fd6;
+--acf: #fff;
+box-sizing: border-box;
+padding-top: env(safe-area-inset-top, 0px);
+padding-bottom: env(safe-area-inset-bottom, 0px)
+}
+
+:root[data-theme="dark"] {
+--g1: #04060d;
+--g2: #18233f;
+--fg: #e6ecf8;
+--pn: rgba(14, 20, 36, .78);
+--bd: rgba(200, 215, 255, .2);
+--ac: #7aa7ff;
+--acf: #06122b
+}
+
+@media (prefers-color-scheme:dark) {
+:root:not([data-theme="light"]) {
+--g1: #04060d;
+--g2: #18233f;
+--fg: #e6ecf8;
+--pn: rgba(14, 20, 36, .78);
+--bd: rgba(200, 215, 255, .2);
+--ac: #7aa7ff;
+--acf: #06122b
+}
+}
+
+html,
+body {
+height: 100%;
+margin: 0;
+overflow: hidden
+}
+
+body {
+background: linear-gradient(180deg, var(--g1), var(--g2) 72%);
+color: var(--fg);
+font-family: "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif;
+transition: background .6s
+}
+
+canvas {
+position: fixed;
+inset: 0;
+width: 100%;
+height: 100%;
+display: block;
+touch-action: none
+}
+
+#top {
+position: fixed;
+left: 16px;
+top: calc(12px + env(safe-area-inset-top, 0px));
+pointer-events: none
+}
+
+#top b {
+font-size: 22px;
+letter-spacing: .04em;
+display: block
+}
+
+#top span {
+font-size: 13px;
+opacity: .7
+}
+
+#ui {
+position: fixed;
+left: 10px;
+right: 10px;
+bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+max-width: 760px;
+margin: 0 auto;
+background: var(--pn);
+border: 1px solid var(--bd);
+border-radius: 14px;
+padding: 8px 10px;
+backdrop-filter: blur(12px);
+-webkit-backdrop-filter: blur(12px)
+}
+
+.g {
+display: flex;
+flex-wrap: wrap;
+gap: 6px;
+align-items: center;
+padding: 4px 0
+}
+
+.g+.g {
+border-top: 1px solid var(--bd)
+}
+
+.g label {
+font-size: 12px;
+opacity: .65;
+width: 36px
+}
+
+button {
+font: inherit;
+font-size: 13px;
+color: var(--fg);
+background: transparent;
+border: 1px solid var(--bd);
+border-radius: 8px;
+padding: 5px 10px;
+cursor: pointer
+}
+
+button:focus-visible {
+outline: 2px solid var(--ac);
+outline-offset: 2px
+}
+
+button.on {
+background: var(--ac);
+color: var(--acf);
+border-color: var(--ac)
+}
+
+#st{font-size:12px;opacity:.8;margin-left:4px}
+#tip {
+position: fixed;
+right: 16px;
+top: calc(14px + env(safe-area-inset-top, 0px));
+font-size: 12px;
+opacity: .6;
+text-align: right;
+pointer-events: none
+}
+</style>
+</head>
+<body>
+<div id="top"><b>天孚TF-580 </b><span>小型公务飞机 · 3D 展示</span></div>
+<div id="tip">拖拽旋转　滚轮或双指缩放<br>右键平移</div>
+<div id="ui">
+<div class="g"><label>视角</label><button data-v="out" class="on">外观</button><button
+data-v="cock">驾驶舱</button><button data-v="cab">客舱前部</button><button data-v="aft">客舱后部</button></div>
+<div class="g"><label>灯光</label><button data-l="nav" class="on">航行灯</button><button data-l="strobe"
+class="on">防撞闪光灯</button><button data-l="beacon" class="on">信标灯</button><button
+data-l="land">着陆灯</button><button data-l="cabin" class="on">舱内灯</button><button
+id="all">全部关闭</button></div>
+<div class="g"><label>飞行</label><button id="fto">起飞</button><button id="fld">降落</button><button id="frs">复位</button><span id="st"></span></div>
+<div class="g"><label>场景</label><button id="ar" class="on">自动旋转</button></div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+const $ = s => document.querySelector(s),
+PI = Math.PI;
+const R = new THREE.WebGLRenderer({
+antialias: true,
+alpha: true
+});
+R.setPixelRatio(Math.min(devicePixelRatio, 2));
+R.shadowMap.enabled = true;
+R.shadowMap.type = THREE.PCFSoftShadowMap;
+R.toneMapping = THREE.ACESFilmicToneMapping;
+R.outputEncoding = THREE.sRGBEncoding;
+document.body.prepend(R.domElement);
+const S = new THREE.Scene(),
+C = new THREE.PerspectiveCamera(38, 1, .05, 300);
+const OC = new THREE.OrbitControls(C, R.domElement);
+OC.enableDamping = true;
+OC.dampingFactor = .07;
+OC.autoRotate = true;
+OC.autoRotateSpeed = .7;
+OC.minDistance = 7;
+OC.maxDistance = 45;
+OC.maxPolarAngle = PI * .52;
+C.position.set(15, 5.5, 14);
+OC.target.set(0, .1, 0);
+const mats = [];
+
+function M(c, r = .4, m = 0) {
+const x = new THREE.MeshStandardMaterial({
+color: c,
+roughness: r,
+metalness: m
+});
+mats.push(x);
+return x
+}
+const hemi = new THREE.HemisphereLight(0xffffff, 0x9aa6b3, .7),
+sun = new THREE.DirectionalLight(0xfff3e0, 2.4);
+sun.position.set(12, 18, 10);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+Object.assign(sun.shadow.camera, {
+left: -14,
+right: 14,
+top: 14,
+bottom: -14,
+near: 1,
+far: 60
+});
+sun.shadow.bias = -.0005;
+S.add(hemi, sun);
+/* 环境反射 */
+const pm = new THREE.PMREMGenerator(R);
+let envRT;
+
+function makeEnv(d) {
+const e = new THREE.Scene(),
+c = document.createElement('canvas');
+c.width = 4;
+c.height = 256;
+const g = c.getContext('2d'),
+gr = g.createLinearGradient(0, 0, 0, 256),
+st = d ? ['#05070f', '#101a33', '#0a0d16'] : ['#7fb2ee', '#e6f0fa', '#8c98a4'];
+gr.addColorStop(0, st[0]);
+gr.addColorStop(.5, st[1]);
+gr.addColorStop(1, st[2]);
+g.fillStyle = gr;
+g.fillRect(0, 0, 4, 256);
+const tx = new THREE.CanvasTexture(c);
+tx.encoding = THREE.sRGBEncoding;
+e.add(new THREE.Mesh(new THREE.SphereGeometry(50, 32, 16), new THREE.MeshBasicMaterial({
+map: tx,
+side: THREE.BackSide
+})));
+const k = d ? .8 : 7;
+[
+[0, 30, 0, 30, 1, 30],
+[40, 10, 10, 1, 15, 30],
+[-40, 12, -10, 1, 15, 30]
+].forEach(a => {
+const b = new THREE.Mesh(new THREE.BoxGeometry(a[3], a[4], a[5]), new THREE.MeshBasicMaterial({
+color: new THREE.Color(k, k, k * (d ? 1.4 : 1))
+}));
+b.position.set(a[0], a[1], a[2]);
+e.add(b)
+});
+if (envRT) envRT.dispose();
+envRT = pm.fromScene(e, .02);
+S.environment = envRT.texture
+}
+/* 地面 */
+function groundTex(col) {
+const c = document.createElement('canvas');
+c.width = c.height = 512;
+const g = c.getContext('2d'),
+r = g.createRadialGradient(256, 256, 0, 256, 256, 256);
+r.addColorStop(0, col);
+r.addColorStop(.55, col);
+r.addColorStop(1, 'rgba(0,0,0,0)');
+g.fillStyle = r;
+g.fillRect(0, 0, 512, 512);
+const t = new THREE.CanvasTexture(c);
+t.encoding = THREE.sRGBEncoding;
+return t
+}
+const gm = new THREE.Mesh(new THREE.CircleGeometry(70, 64), new THREE.MeshStandardMaterial({
+transparent: true,
+roughness: .85
+}));
+gm.rotation.x = -PI / 2;
+gm.position.y = -2.4;
+gm.receiveShadow = true;
+S.add(gm);
+const line = new THREE.Mesh(new THREE.PlaneGeometry(50, .14), new THREE.MeshStandardMaterial({
+color: 0xe8c547,
+roughness: .8
+}));
+line.rotation.x = -PI / 2;
+line.position.y = -2.39;
+line.receiveShadow = true;
+line.visible=false;
+/* 光晕与灯 */
+const glow = (() => {
+const c = document.createElement('canvas');
+c.width = c.height = 64;
+const g = c.getContext('2d'),
+r = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+r.addColorStop(0, 'rgba(255,255,255,1)');
+r.addColorStop(.25, 'rgba(255,255,255,.45)');
+r.addColorStop(1, 'rgba(255,255,255,0)');
+g.fillStyle = r;
+g.fillRect(0, 0, 64, 64);
+return new THREE.CanvasTexture(c)
+})();
+const LT = {
+nav: [],
+strobe: [],
+beacon: [],
+land: []
+};
+
+function bulb(g, k, col, pos, size, pi, range) {
+const m = new THREE.Mesh(new THREE.SphereGeometry(size * .16, 12, 8), new THREE.MeshBasicMaterial({
+color: 0x333333
+}));
+const sp = new THREE.Sprite(new THREE.SpriteMaterial({
+map: glow,
+color: col,
+blending: THREE.AdditiveBlending,
+depthWrite: false,
+transparent: true,
+opacity: 0
+}));
+sp.scale.setScalar(size);
+const o = {
+m,
+sp,
+col: new THREE.Color(col),
+pi
+};
+const a = [m, sp];
+if (pi > 0) {
+o.pl = new THREE.PointLight(col, 0, range, 1);
+a.push(o.pl)
+}
+a.forEach(x => x.position.set(...pos));
+g.add(...a);
+LT[k].push(o);
+return o
+}
+
+function setL(o, v) {
+o.sp.material.opacity = v;
+o.sp.visible = v > .01;
+o.m.material.color.set(0x333333).lerp(o.col, v);
+if (o.pl) o.pl.intensity = o.pi * v;
+if (o.spot) {
+o.spot.intensity = 6 * v;
+o.beam.material.opacity = .13 * v;
+o.beam.visible = v > .01
+}
+}
+/* 机身 */
+const plane = new THREE.Group();
+S.add(plane);
+
+function rad(y) {
+if (y > 5.2) {
+const t = Math.min(1, (8 - y) / 2.8);
+return 1.15 * Math.pow(Math.sin(t * PI / 2), .62)
+}
+if (y > -2.5) return 1.15;
+const t = (y + 8) / 5.5;
+return .22 + .93 * Math.pow(t, .8)
+}
+const prof = [new THREE.Vector2(0, -8)];
+for (let i = 0; i <= 120; i++) {
+const y = -8 + 16 * i / 120;
+prof.push(new THREE.Vector2(rad(y), y))
+}
+const sc = document.createElement('canvas');
+sc.width = sc.height = 512; {
+const g = sc.getContext('2d');
+g.fillStyle = '#f6f8fa';
+g.fillRect(0, 0, 512, 512);
+g.fillStyle = '#c5ccd5';
+g.fillRect(.1 * 512, 0, .3 * 512, 512);
+[
+[.015, .03, '#14305c'],
+[.455, .03, '#14305c'],
+[.05, .008, '#c9a24a'],
+[.442, .008, '#c9a24a']
+].forEach(s => {
+g.fillStyle = s[2];
+g.fillRect(s[0] * 512, 0, s[1] * 512, 512)
+})
+}
+const st = new THREE.CanvasTexture(sc);
+st.encoding = THREE.sRGBEncoding;
+const mF = new THREE.MeshPhysicalMaterial({
+map: st,
+roughness: .3,
+metalness: .2,
+clearcoat: .8,
+clearcoatRoughness: .15,
+side: THREE.DoubleSide
+});
+mats.push(mF);
+const fus = new THREE.Mesh(new THREE.LatheGeometry(prof, 64), mF);
+fus.rotation.z = -PI / 2;
+fus.castShadow = true;
+plane.add(fus);
+const mL = M(0xe9e1d3, .85);
+mL.side = THREE.DoubleSide;
+const liner = new THREE.Mesh(new THREE.LatheGeometry(prof.map(p => new THREE.Vector2(p.x * .95, p.y)), 48), mL);
+liner.rotation.z = -PI / 2;
+plane.add(liner);
+const glass = M(0x0a121c, .05, .9),
+winIn = [];
+
+function win(x, y, sx, sy) {
+const ro = Math.sqrt(1.15 * 1.15 - y * y),
+ri = Math.sqrt(1.0925 * 1.0925 - y * y) - .012;
+[1, -1].forEach(s => {
+const w = new THREE.Mesh(new THREE.SphereGeometry(1, 16, 12), glass);
+w.scale.set(sx, sy, .05);
+w.position.set(x, y, s * ro);
+plane.add(w);
+const p = new THREE.Mesh(new THREE.CircleGeometry(1, 20), new THREE.MeshBasicMaterial({
+color: 0xbfe3ff,
+side: THREE.DoubleSide
+}));
+p.scale.set(sx, sy, 1);
+p.position.set(x, y, s * ri);
+p.lookAt(x, y, 0);
+plane.add(p);
+winIn.push(p)
+})
+}
+for (let i = 0; i < 8; i++) win(-2.6 + .9 * i, .25, .27, .19);
+win(4.55, .4, .32, .2);
+win(5.0, .4, .3, .2);
+const wsh = new THREE.Mesh(new THREE.SphereGeometry(1, 24, 16), glass);
+wsh.scale.set(.75, .42, .62);
+wsh.position.set(5.7, .78, 0);
+wsh.rotation.z = -.25;
+plane.add(wsh);
+/* 机翼 机尾 发动机 起落架（对称） */
+const Mw = M(0xeef1f5, .35, .2),
+Mn = M(0x14305c, .3, .3),
+Mk = M(0x20242b, .8),
+Mm = M(0x2a2e35, .4, .9);
+const MG=[],NG=new THREE.Group();NG.position.set(4.3,-1.15,0);plane.add(NG);
+const shp = a => {
+const s = new THREE.Shape();
+a.forEach((p, i) => i ? s.lineTo(p[0], p[1]) : s.moveTo(p[0], p[1]));
+return s
+};
+const ext = (s, d) => new THREE.ExtrudeGeometry(s, {
+depth: d,
+bevelEnabled: true,
+bevelThickness: .03,
+bevelSize: .03,
+bevelSegments: 2
+});
+const mesh = (g, m, p) => {
+const o = new THREE.Mesh(g, m);
+o.position.set(...p);
+o.castShadow = true;
+return o
+};
+[1, -1].forEach(s => {
+const g = new THREE.Group();
+g.scale.z = s;
+plane.add(g);
+const w = mesh(ext(shp([
+[1.2, .3],
+[-1.7, 6],
+[-2.9, 6],
+[-1.4, .3]
+]), .1), Mw, [0, -.5, 0]);
+w.rotation.x = PI / 2 - .06;
+g.add(w);
+const wl = mesh(ext(shp([
+[0, 0],
+[.55, 0],
+[-.15, .95],
+[-.45, .95]
+]), .05), Mn, [-2.35, -.14, 5.95]);
+wl.rotation.x = .15;
+g.add(wl);
+const sb = mesh(ext(shp([
+[-6.5, 0],
+[-7.6, 2.2],
+[-8.1, 2.2],
+[-7.7, 0]
+]), .1), Mw, [0, 2.95, 0]);
+sb.rotation.x = PI / 2;
+g.add(sb);
+g.add(mesh(new THREE.CylinderGeometry(.27, .34, 2.2, 28).rotateZ(PI / 2), Mw, [-5, .35, 1.25]));
+g.add(mesh(new THREE.CylinderGeometry(.2, .26, .3, 24).rotateZ(PI / 2), Mm, [-6.2, .35, 1.25]));
+const ci = new THREE.Mesh(new THREE.CircleGeometry(.27, 20).rotateY(PI / 2), Mk);
+ci.position.set(-3.89, .35, 1.25);
+g.add(ci);
+g.add(mesh(new THREE.BoxGeometry(1.4, .1, .45), Mw, [-5, .35, .95]));
+const mg=new THREE.Group();mg.position.set(-.7,-.4,1.0);g.add(mg);MG.push(mg);
+mg.add(mesh(new THREE.CylinderGeometry(.05,.05,1.5,10),Mm,[0,-.95,0]));
+mg.add(mesh(new THREE.CylinderGeometry(.3,.3,.2,24).rotateX(PI/2),Mk,[0,-1.7,0]));
+mg.add(mesh(new THREE.CylinderGeometry(.14,.14,.22,16).rotateX(PI/2),Mm,[0,-1.7,0]));
+NG.add(mesh(new THREE.CylinderGeometry(.3,.3,.14,24).rotateX(PI/2),Mk,[0,-.95,s*.12]));
+bulb(g, 'nav', s > 0 ? 0x22ff66 : 0xff2222, [-2.55, .8, 6.05], .9, 1.6, 7);
+bulb(g, 'strobe', 0xffffff, [-2.85, -.12, 5.95], 1.5, 0, 0);
+const sp = new THREE.SpotLight(0xfff1d0, 0, 70, .38, .55, 1);
+sp.position.set(.3, -.5, 2.2);
+const tg = new THREE.Object3D();
+tg.position.set(30, -2.4, 2.6);
+g.add(sp, tg);
+sp.target = tg;
+const beam = new THREE.Mesh(new THREE.CylinderGeometry(.03, 2.2, 24, 24, 1, true).translate(0, -12, 0),
+new THREE.MeshBasicMaterial({
+color: 0xfff1d0,
+transparent: true,
+opacity: 0,
+blending: THREE.AdditiveBlending,
+depthWrite: false,
+side: THREE.DoubleSide
+}));
+beam.position.set(.3, -.5, 2.2);
+beam.rotation.z = PI / 2 - .064;
+g.add(beam);
+const lb = bulb(g, 'land', 0xfff1d0, [.3, -.5, 2.2], 1.1, 0, 0);
+lb.spot = sp;
+lb.beam = beam
+});
+NG.add(mesh(new THREE.CylinderGeometry(.05,.05,1.0,10),Mm,[0,-.5,0]));
+const fin = mesh(ext(shp([
+[-4.2, .4],
+[-6.6, 3],
+[-7.7, 3],
+[-7.6, .4]
+]), .1), Mn, [0, 0, -.05]);
+plane.add(fin);
+bulb(plane, 'nav', 0xffffff, [-7.85, 2.7, 0], .8, 1, 6);
+bulb(plane, 'beacon', 0xff2020, [-2, 1.17, 0], 1.4, 0, 0);
+bulb(plane, 'beacon', 0xff2020, [-1, -1.17, 0], 1.4, 0, 0);
+/* 内饰 */
+const Ms = M(0xb68a5c, .55),
+Mc = M(0x3a4352, .9),
+Mt = M(0x5a4030, .4),
+Md = M(0x12161d, .3, .5);
+const add = (g, m, s, p) => {
+const o = new THREE.Mesh(new THREE.BoxGeometry(...s), m);
+o.position.set(...p);
+g.add(o);
+return o
+};
+add(plane, Mc, [8.4, .1, 1.85], [.9, -.6, 0]);
+add(plane, Mc, [1.2, .1, 1.5], [5.3, -.6, 0]);
+const bh = new THREE.Mesh(new THREE.CircleGeometry(1.1, 32).rotateY(PI / 2), M(0xd9d0c0, .9));
+bh.material.side = THREE.DoubleSide;
+bh.position.x = -3.45;
+plane.add(bh);
+
+function seat(x, z, d, y = -.55) {
+const g = new THREE.Group();
+g.position.set(x, y, z);
+g.rotation.y = d > 0 ? 0 : PI;
+add(g, Ms, [.55, .28, .55], [0, .14, 0]);
+add(g, Ms, [.12, .62, .55], [-.22, .5, 0]);
+add(g, Ms, [.14, .2, .34], [-.22, .92, 0]);
+add(g, Ms, [.5, .1, .08], [0, .4, .31]);
+add(g, Ms, [.5, .1, .08], [0, .4, -.31]);
+plane.add(g)
+}
+[1, -1].forEach(s => {
+[
+[-2.1, 1],
+[-.8, -1],
+[.9, 1],
+[2.2, -1]
+].forEach(a => seat(a[0], s * .68, a[1]));
+add(plane, Mt, [.45, .04, .4], [-1.45, -.12, s * .7]);
+add(plane, Mt, [.45, .04, .4], [1.55, -.12, s * .7]);
+add(plane, Mt, [.08, .4, .08], [-1.45, -.35, s * .7]);
+add(plane, Mt, [.08, .4, .08], [1.55, -.35, s * .7]);
+seat(4.6, s * .45, 1)
+});
+add(plane, Md, [.12, .5, 1.5], [5.4, -.1, 0]);
+[-.45, 0, .45].forEach(z => add(plane, new THREE.MeshBasicMaterial({
+color: 0x35d0ff
+}), [.02, .2, .3], [5.33, .02, z]));
+const cwin = (x, y, z) => {
+const p = new THREE.Mesh(new THREE.CircleGeometry(.3, 16), new THREE.MeshBasicMaterial({
+color: 0xbfe3ff,
+side: THREE.DoubleSide
+}));
+p.scale.set(1.3, .8, 1);
+p.position.set(x, y, z);
+p.lookAt(0, y, 0);
+plane.add(p);
+winIn.push(p)
+};
+cwin(5.15, .4, .5);
+cwin(5.15, .4, -.5);
+const stripM = new THREE.MeshBasicMaterial({
+color: 0x222018
+});
+[.5, -.5].forEach(z => add(plane, stripM, [7, .02, .1], [.4, .9, z]));
+const cabPL = [-2, .6, 3.2].map(x => {
+const p = new THREE.PointLight(0xffe2b8, 0, 6, 1);
+p.position.set(x, .75, 0);
+plane.add(p);
+return p
+});
+/* 主题 灯光状态 */
+const on = {
+nav: true,
+strobe: true,
+beacon: true,
+land: false,
+cabin: true
+};
+let dark = true;
+
+function theme(d) {
+dark = d;
+document.documentElement.dataset.theme = d ? 'dark' : 'light';
+hemi.intensity = d ? .12 : .7;
+hemi.color.set(d ? 0x4a5d8a : 0xffffff);
+hemi.groundColor.set(d ? 0x10131c : 0x9aa6b3);
+sun.intensity = d ? .35 : 2.4;
+sun.color.set(d ? 0x8fa8ff : 0xfff3e0);
+R.toneMappingExposure = d ? 1.15 : 1;
+gm.material.map = groundTex(d ? '#222937' : '#c9d1da');
+gm.material.needsUpdate = true;
+mats.forEach(m => m.envMapIntensity = d ? .35 : 1);
+winIn.forEach(w => w.material.color.set(d ? 0x0b1633 : 0xbfe3ff));
+makeEnv(d);
+
+}
+theme(true);
+
+$('#ar').onclick = e => {
+OC.autoRotate = !OC.autoRotate;
+e.target.classList.toggle('on', OC.autoRotate)
+};
+document.querySelectorAll('[data-l]').forEach(b => b.onclick = () => {
+const k = b.dataset.l;
+on[k] = !on[k];
+b.classList.toggle('on', on[k]);
+sync()
+});
+
+function sync() {
+const any = Object.values(on).some(Boolean);
+$('#all').textContent = any ? '全部关闭' : '全部开启'
+}
+$('#all').onclick = () => {
+const v = !Object.values(on).some(Boolean);
+for (const k in on) {
+on[k] = v;
+$('[data-l=' + k + ']').classList.toggle('on', v)
+}
+sync()
+};
+/* 视角切换 */
+const VW = {
+out: {
+p: [15, 5.5, 14],
+t: [0, .1, 0]
+},
+cock: {
+t: [3.9, .3, 0],
+d: 1
+},
+cab: {
+t: [2.9, .2, 0],
+d: -1
+},
+aft: {
+t: [-3.2, .2, 0],
+d: 1
+}
+};
+let anim = 0,
+sP, sT, eP = new THREE.Vector3(),
+eT = new THREE.Vector3(),
+inside = false;
+document.querySelectorAll('[data-v]').forEach(b => b.onclick = () => {
+document.querySelectorAll('[data-v]').forEach(x => x.classList.toggle('on', x === b));
+const v = VW[b.dataset.v];
+inside = b.dataset.v !== 'out';
+sP = C.position.clone();
+sT = OC.target.clone();
+eT.set(...v.t);
+if (inside) eP.set(v.t[0] - v.d * .02, v.t[1], v.t[2]);
+else eP.set(...v.p);
+OC.enabled = false;
+OC.minDistance = .01;
+OC.maxDistance = 100;
+OC.autoRotate = false;
+anim = 1;
+if (inside) $('#ar').classList.remove('on')
+});
+/* 飞行模拟 */
+const F={spd:0,alt:0,pitch:0,gear:1,tS:0,tA:0,tP:0,tG:1,mode:'',stage:'地面停机',tm:[],td:0,fl:0};
+const clr=()=>{F.tm.forEach(clearTimeout);F.tm=[]},later=(ms,f)=>F.tm.push(setTimeout(f,ms));
+function setLand(v){on.land=v;$('[data-l=land]').classList.toggle('on',v);sync()}
+$('#fto').onclick=()=>{if(F.alt>.05||F.mode)return;clr();F.mode='to';setLand(true);F.stage='起飞滑跑';F.tS=1;
+later(6000,()=>{F.stage='抬轮离地';F.tP=.17});later(7500,()=>{F.stage='爬升';F.tA=1});
+later(9500,()=>{F.tG=0});later(14500,()=>{F.stage='巡航';F.tP=.04;setLand(false);F.mode='';});};
+$('#fld').onclick=()=>{if(F.alt<.5||F.mode==='land')return;clr();F.mode='land';F.td=0;F.fl=0;setLand(true);F.stage='进近';F.tG=1;F.tS=.7;F.tA=0;F.tP=-.05;};
+$('#frs').onclick=()=>{clr();Object.assign(F,{spd:0,alt:0,pitch:0,gear:1,tS:0,tA:0,tP:0,tG:1,mode:'',stage:'地面停机',td:0});setLand(false)};
+const NS=400,spA=new Float32Array(NS*6),scA=new Float32Array(NS*6),sd=[];
+for(let i=0;i<NS;i++){const w=i%2,a=Math.random()*PI*2,r=1.5+Math.pow(Math.random(),1.5)*8;
+sd.push(w?{x:Math.random()*80-40,y:-.5+(Math.random()-.5)*1.4,z:(Math.random()<.5?1:-1)*(1.3+Math.random()*5),l:.6+Math.random()*1.4,v:.8+Math.random()*.4}:
+{x:Math.random()*80-40,y:Math.sin(a)*r*.7,z:Math.cos(a)*r,l:.6+Math.random()*1.4,v:.8+Math.random()*.4});scA.set([.55,.8,1,0,0,0],i*6)}
+const sg=new THREE.BufferGeometry();sg.setAttribute('position',new THREE.BufferAttribute(spA,3));sg.setAttribute('color',new THREE.BufferAttribute(scA,3));
+const sm=new THREE.LineSegments(sg,new THREE.LineBasicMaterial({vertexColors:true,transparent:true,blending:THREE.AdditiveBlending,depthWrite:false,opacity:0}));sm.frustumCulled=false;S.add(sm);
+const VT=[1,-1].map(s=>{const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.BufferAttribute(new Float32Array(210),3));
+const l=new THREE.Line(g,new THREE.LineBasicMaterial({color:0xb8e0ff,transparent:true,blending:THREE.AdditiveBlending,depthWrite:false,opacity:0}));l.frustumCulled=false;plane.add(l);return{l,s}});
+const CL=[];for(let i=0;i<22;i++){const c=new THREE.Sprite(new THREE.SpriteMaterial({map:glow,color:0x5a6c9a,transparent:true,opacity:0,depthWrite:false}));c.scale.set(26+Math.random()*20,10,1);c.position.set(Math.random()*160-80,-10-Math.random()*10,Math.random()*80-40);S.add(c);CL.push(c)}
+const DG=new THREE.Group();S.add(DG);for(let i=0;i<14;i++){const d=new THREE.Mesh(new THREE.PlaneGeometry(3,.18),new THREE.MeshBasicMaterial({color:0x9aa3b8}));d.rotation.x=-PI/2;d.position.x=-45+i*7;DG.add(d)}
+let lastTxt='';
+function fup(dt,t){
+const ap=(c,g,r)=>c+(g-c)*(1-Math.exp(-r*dt)),cl=(v,m)=>Math.max(-m,Math.min(m,v));
+F.spd=ap(F.spd,F.tS,.35);F.pitch=ap(F.pitch,F.tP,1.4);
+F.alt+=cl(F.tA-F.alt,.1*dt);F.gear+=cl(F.tG-F.gear,dt/3);
+if(F.mode==='land'){
+if(F.alt<.12&&!F.fl){F.fl=1;F.tP=.08;F.stage='拉平'}
+if(F.alt<=.001&&!F.td){F.td=1;F.tP=0;F.tS=0;F.stage='着陆滑跑'}
+if(F.td&&F.spd<.02){F.mode='';F.stage='地面停机';F.spd=0;setLand(false)}}
+const g=F.gear,k=1-g*g*(3-2*g);
+MG.forEach(m=>{m.rotation.x=k*1.4;m.visible=g>.01});NG.rotation.z=-k*1.5;NG.visible=g>.01;
+plane.rotation.z=F.pitch;plane.rotation.x=Math.sin(t*.6)*.04*F.alt;plane.position.y=Math.sin(t*.9)*.08*F.alt;
+const gy=-2.4-80*F.alt*F.alt;gm.position.y=gy;gm.visible=F.alt<.98;DG.position.y=gy+.012;DG.visible=gm.visible;
+DG.children.forEach(d=>{d.position.x-=70*F.spd*dt;if(d.position.x<-45)d.position.x+=98});
+for(let i=0;i<NS;i++){const d=sd[i];d.x-=70*F.spd*d.v*dt;if(d.x<-40)d.x+=80;const L=d.l*(.3+F.spd*3.5);
+spA[i*6]=d.x;spA[i*6+1]=d.y;spA[i*6+2]=d.z;spA[i*6+3]=d.x+L;spA[i*6+4]=d.y;spA[i*6+5]=d.z}
+sg.attributes.position.needsUpdate=true;sm.material.opacity=Math.min(1,F.spd*1.4)*.9;
+VT.forEach(v=>{const a=v.l.geometry.attributes.position;for(let j=0;j<70;j++){const u=j/69,an=u*30-t*12,r=.1+u*.5;a.setXYZ(j,-2.9-u*22,-.3+Math.sin(an)*r,v.s*(6-u*.3)+Math.cos(an)*r)}a.needsUpdate=true;v.l.material.opacity=.7*Math.min(1,F.alt*3)*Math.min(1,F.spd*1.5)});
+CL.forEach(c=>{c.position.x-=45*F.spd*dt;if(c.position.x<-80)c.position.x+=160;c.material.opacity=.16*Math.min(1,F.alt*2)});
+const gt=g>.98?'放下':g<.02?'收起':(F.tG?'放下中':'收起中'),tx=F.stage+' · 起落架'+gt;
+if(tx!==lastTxt){lastTxt=tx;$('#st').textContent=tx}}
+/* 循环 */
+function size() {
+R.setSize(innerWidth, innerHeight);
+C.aspect = innerWidth / innerHeight;
+C.updateProjectionMatrix()
+}
+addEventListener('resize', size);
+size();
+const clk = new THREE.Clock();
+
+function tick() {
+const dt = Math.min(clk.getDelta(), .05),
+t = clk.elapsedTime;
+if (anim > 0) {
+anim = Math.max(0, anim - dt / 1.3);
+const k = 1 - anim,
+e = k * k * (3 - 2 * k);
+C.position.lerpVectors(sP, eP, e);
+OC.target.lerpVectors(sT, eT, e);
+if (anim === 0) {
+OC.enabled = true;
+OC.enablePan = !inside;
+OC.enableZoom = !inside;
+OC.rotateSpeed = inside ? -.45 : 1;
+OC.minDistance = inside ? .02 : 7;
+OC.maxDistance = inside ? .02 : 45;
+OC.maxPolarAngle = inside ? PI : PI * .52
+}
+}
+LT.nav.forEach(o => setL(o, on.nav ? 1 : 0));
+const ph = t % 1.2,
+fl = on.strobe && (ph < .07 || (ph > .2 && ph < .27)) ? 1 : 0;
+LT.strobe.forEach(o => setL(o, fl));
+const bv = on.beacon ? Math.pow(Math.max(0, Math.sin(t * 5.5)), 2) : 0;
+LT.beacon.forEach(o => setL(o, bv));
+LT.land.forEach(o => setL(o, on.land ? 1 : 0));
+cabPL.forEach(p => p.intensity = on.cabin ? 1.15 : 0);
+stripM.color.set(0x222018).lerp(new THREE.Color(0xfff3d6), on.cabin ? 1 : 0);
+fup(dt,t);
+OC.update();
+R.render(S, C);
+requestAnimationFrame(tick)
+}
+tick();
+</script>
+</body>
+</html>
